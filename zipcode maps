@@ -1,0 +1,101 @@
+library(readr)
+library(tigris)
+library(ggplot2)
+library(sf)
+library(dplyr)
+library(scales)
+library(RColorBrewer)
+library(readxl)
+library(zipcodeR)
+
+data <- read_excel("datapath")
+View(data)
+
+options(tigris_use_cache = TRUE)
+
+mi_zip_data <- search_state("MI")
+
+# Get shapefile data for Michigan ZIP code boundaries
+mi_zip_shapes <- zctas(cb = FALSE, state = "MI", year = 2010)
+
+# Convert to an sf object for mapping
+mi_zip_shapes_sf <- st_as_sf(mi_zip_shapes)
+
+map_data <- merge(mi_zip_shapes_sf, data, by.x = "ZCTA5CE10", by.y = "zipcode")
+
+#map of michigan zipcodes with participating zipcodes in green
+ggplot() +
+  geom_sf(data = mi_zip_shapes_sf, fill = "lightgray", color = "black") +  # Michigan state boundary
+  geom_sf(data = map_data, fill = "darkgreen", color = "black") +  # Fill ZIP codes with a solid color 
+  labs(title = "Participants by ZIP Code in Michigan", x = NULL, y = NULL) +  # Remove axis labels
+  theme_minimal() +
+  theme(
+    legend.position = "none",            
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),  
+    axis.line = element_blank(),         
+    axis.text = element_blank(),         
+    axis.ticks = element_blank()         
+  )
+
+#create an outline of michigan counties
+mi_cb <- counties("MI", cb = TRUE)
+
+#Overlay zipcode data on map of michigan counties
+ggplot() +
+  geom_sf(data = mi_cb, fill = "lightgray", color = "black") +  # Michigan state boundary
+  geom_sf(data = map_data, fill = "darkgreen", color = "black") +  # Fill ZIP codes with a solid color
+  labs(title = "Participants by ZIP Code in Michigan", x = NULL, y = NULL) +  # Remove axis labels
+  theme_minimal() +
+  theme(
+    legend.position = "none",            
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),  
+    axis.line = element_blank(),         
+    axis.text = element_blank(),         
+    axis.ticks = element_blank()         
+  )
+
+#create an outline of michigan
+mi_boundaries <- states(cb = TRUE) %>% 
+  filter(NAME == "Michigan")
+
+# Convert to an 'sf' object for easier plotting
+mi_boundaries_sf <- st_as_sf(mi_boundaries)
+
+#create map of participating michigan zipcodes within the outline of michigan
+ggplot() +
+  geom_sf(data = mi_boundaries_sf, fill = "lightgray", color = "black") +  # Michigan state boundary
+  geom_sf(data = map_data, fill = "darkgreen", color = "black") +  # Fill ZIP codes with a solid color (blue)
+  labs(title = "Participants by ZIP Code in Michigan", x = NULL, y = NULL) +  # Remove axis labels
+  theme_minimal() +
+  theme(
+    legend.position = "none",            
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),  
+    axis.line = element_blank(),         
+    axis.text = element_blank(),         
+    axis.ticks = element_blank()         
+  )
+
+# Create a new variable `zipcode_count` based on the frequency of each zip code appearing in data
+data <- data %>%
+  group_by(zipcode) %>%
+  mutate(zipcode_count = n()) %>%
+  ungroup()  
+
+#plot the frequency with a monochrome scale of zipcodes appearing in the data ontop of a map of michigan county boundaries
+ggplot(data = map_data) +
+  geom_sf(data = mi_cb, fill = "lightgray", color = "black") +  
+  geom_sf(aes(fill = zipcode_count), color = "black", size = 0.2) +
+  scale_fill_gradient(low = "lightgreen", high = "darkgreen", na.value = "gray90") +  # Monochrome scale
+  labs(fill = "Zip Code Count", 
+       title = "Participants based on zipcode") +
+  theme_minimal() +
+  theme(            
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),  
+    axis.line = element_blank(),         
+    axis.text = element_blank(),         
+    axis.ticks = element_blank()         
+  )
